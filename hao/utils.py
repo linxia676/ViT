@@ -44,9 +44,6 @@ def gpu(i=0):
     """Get a GPU device."""
     return torch.device(f'cuda:{i}')
 
-def max_gpus():
-    return torch.cuda.device_count()
-
 class Point:
     def __init__(self, x, y):
         self.x = x
@@ -154,9 +151,9 @@ class ProgressBoard(HyperParameters):
 
 class Trainer(HyperParameters):
     """The base class for training models with data."""
-    def __init__(self, max_epochs, num_gpus, last_model_path=None, best_model_path=None, gradient_clip_val=0):
+    def __init__(self, max_epochs, last_model_path, best_model_path, restart_train=False, gpu_idx = 0, gradient_clip_val=0):
         self.save_hyperparameters()
-        self.gpus = [gpu(i) for i in range(min(num_gpus, max_gpus()))]
+        self.gpus = [gpu(i) for i in range(self.max_gpus())]
 
     def prepare_data(self, data):
         self.train_dataloader = data.train_dataloader()
@@ -166,7 +163,7 @@ class Trainer(HyperParameters):
                                 if self.val_dataloader is not None else 0)
 
     def load_model(self):
-        if os.path.exists(self.last_model_path):
+        if os.path.exists(self.last_model_path) and not self.restart_train:
             checkpoint = torch.load(self.last_model_path)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optim.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -204,10 +201,14 @@ class Trainer(HyperParameters):
         self.epoch_his['val_acc'].append(val_acc)
         self.epoch_his['last_epoch'] = self.epoch
 
+    def max_gpus(self):
+        self.num_gpus = torch.cuda.device_count()
+        return self.num_gpus
+
     def save_model(self, best_model = False):
         checkpoint = {
             'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optim.state_dict(), 
+            'optimizer_state_dict': self.optim.state_dict(),
             'epoch_his': self.epoch_his,
             'board_data': self.model.board.data
         }
@@ -218,13 +219,13 @@ class Trainer(HyperParameters):
             torch.save(checkpoint, self.best_model_path)
         else:
             torch.save(checkpoint, self.last_model_path)
-    
+
     def print_training_his(self, max_epochs):
         for i in range(max_epochs):
             train_loss = self.epoch_his['train_losses'][i]
             val_loss = self.epoch_his['val_losses'][i]
             val_acc = self.epoch_his['val_acc'][i]
-            print(f"Epoch {i + 1:<2}: train loss {train_loss:<4.4f}  val loss -- {val_loss:<4.4f} Acc {100.0 * val_acc:<5.2f}%")
+            print(f"Epoch {i + 1:<2}: train loss {train_loss:<4.4f} val loss {val_loss:<4.4f} val acc {100.0 * val_acc:<5.2f}%")
 
     def fit_epoch(self):
         self.model.train()
@@ -249,7 +250,7 @@ class Trainer(HyperParameters):
                 val_loss_sum += loss
                 val_acc += acc
             self.val_batch_idx += 1
-        
+
         train_loss = train_loss_sum / self.num_train_batches
         val_loss = val_loss_sum / self.num_val_batches
         val_acc = val_acc / self.num_val_batches
@@ -258,7 +259,7 @@ class Trainer(HyperParameters):
 
     def prepare_batch(self, batch):
         if self.gpus:
-            batch = [e.to(self.gpus[0]) for e in batch]
+            batch = [e.to(self.gpus[self.gpu_idx]) for e in batch]
         return batch
 
 

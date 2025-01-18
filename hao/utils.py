@@ -62,7 +62,7 @@ class ProgressBoard(HyperParameters):
     """The board that plots data points in animation."""
     def __init__(self, xlabel=None, ylabel=None, xlim=None,
                  ylim=None, xscale='linear', yscale='linear',
-                 ls=['-*', '--o', '-.v', ':h'], colors=['#155E95', '#5D8736', '#A888B5', '#C30E59'],
+                 ls=['-*', '--o', '-.v', ':h', ',^', ':v', '--'], colors=['#155E95', '#5D8736', '#A888B5', '#C30E59', '#D2691E', '#FFD700', '#2E8B57'],
                  fig=None, axes=None, figsize=(8, 4.5), display=True):
         self.save_hyperparameters()
 
@@ -221,11 +221,18 @@ class Trainer(HyperParameters):
             torch.save(checkpoint, self.last_model_path)
 
     def print_training_his(self, max_epochs):
+        # best_train_loss, best_val_loss, best_val_acc= float('inf'),  float('inf'), 0
         for i in range(max_epochs):
             train_loss = self.epoch_his['train_losses'][i]
             val_loss = self.epoch_his['val_losses'][i]
             val_acc = self.epoch_his['val_acc'][i]
+            # best_train_loss = min(best_train_loss, train_loss)
             print(f"Epoch {i + 1:<2}: train loss {train_loss:<4.4f} val loss {val_loss:<4.4f} val acc {100.0 * val_acc:<5.2f}%")
+        best_epoch, best_val_loss = min(enumerate(self.epoch_his['val_losses']), key=lambda x: x[1])
+        best_train_loss, best_val_acc = self.epoch_his['train_losses'][best_epoch], self.epoch_his['val_acc'][best_epoch]
+        print(f"*Best epoch {best_epoch + 1:<2}: train loss {best_train_loss:<4.4f} val loss {best_val_loss:<4.4f} val acc {100.0 * best_val_acc:<5.2f}%")
+        
+        
 
     def fit_epoch(self):
         self.model.train()

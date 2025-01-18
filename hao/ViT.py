@@ -78,3 +78,6 @@ class ViT(Classifier):
         for blk in self.blks:
             X = blk(X)
         return self.head(X[:, 0])
+    
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=self.lr)

@@ -25,11 +25,9 @@ class Module(nn.Module, u.HyperParameters):
         if train:
             x = self.trainer.epoch + self.trainer.train_batch_idx / \
                 self.trainer.num_train_batches
-            # x = self.trainer.epoch + 1
             n = self.trainer.num_train_batches / \
                 self.plot_train_per_epoch
         else:
-            # x = self.trainer.epoch + 1
             x = self.trainer.epoch + self.trainer.val_batch_idx / \
                 self.trainer.num_val_batches
             n = self.trainer.num_val_batches / \

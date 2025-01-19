@@ -22,6 +22,7 @@ class Module(nn.Module, u.HyperParameters):
         """Plot a point in animation."""
         assert hasattr(self, 'trainer'), 'Trainer is not inited'
         self.board.xlabel = 'epoch'
+        # self.board.xlim = [0, 4]
         if train:
             x = self.trainer.epoch + self.trainer.train_batch_idx / \
                 self.trainer.num_train_batches

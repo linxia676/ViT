@@ -88,21 +88,27 @@ class Instruction_ViT(Classifier):
         for blk in self.blks:
             X = blk(X)
         X = self.final_norm(X)
+        # print(X)
         image_features, text_features = X[:, 0], X[:, -self.num_classes:]
+        image_features = torch.nn.functional.normalize(image_features,p=2,dim=1) 
+        text_features = torch.nn.functional.normalize(text_features,p=2,dim=2)
+        # print(text_features)
         # image_features: [batch, embedding]
         # text_features: [batch, category, embedding]
         # output: [batch, category]
         similarity = torch.einsum('be,bce->bc', image_features, text_features)
         similarity = 100.0 * similarity
         similarity = similarity.softmax(dim=-1)
+        # print(similarity[0])
         return self.head(X[:, 0]), similarity
     
     def training_step(self, batch):
         Y_hat, Sim = self(*batch[:-1])
         loss1 = self.loss(Y_hat, batch[-1])
         loss2 = self.loss(Sim, batch[-1])
-        loss = loss1 + loss2
-        loss /= 2
+        # lamd = 1 / self.num_classes
+        lamd = 0.5
+        loss = (1 - lamd) * loss1 + lamd * loss2
         # self.plot('loss1', loss1, train=True)
         # self.plot('loss2', loss2, train=True)
         self.plot('loss', loss, train=True)
@@ -112,8 +118,9 @@ class Instruction_ViT(Classifier):
         Y_hat, Sim = self(*batch[:-1])
         loss1 = self.loss(Y_hat, batch[-1])
         loss2 = self.loss(Sim, batch[-1])
-        loss = loss1 + loss2
-        loss /= 2
+        # lamd = 1 / self.num_classes
+        lamd = 0.5
+        loss = (1 - lamd) * loss1 + lamd * loss2
         acc = self.accuracy(Y_hat, batch[-1])
         # self.plot('loss1', loss1, train=False)
         # self.plot('loss2', loss2, train=False)

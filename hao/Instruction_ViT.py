@@ -62,14 +62,13 @@ class Instruction_ViT(Classifier):
         self.clip = CLIP()
         self.prompt_proj = nn.Linear(512,num_hiddens)
 
-        self.prompt_tokens = self.prompt_proj(self.clip.encode_text(texts)).unsqueeze(0)
+        self.prompt_tokens = self.prompt_proj(self.clip.encode_text(texts))[None, :]
         # self.prompt_tokens = self.prompt_proj(torch.rand(num_classes, 512)).unsqueeze(0)
         self.prompt_tokens = nn.Parameter(self.prompt_tokens)
         num_steps = self.patch_embedding.num_patches + 1 + num_classes  # Add the cls + prompt token
 
         # Positional embeddings are learnable
-        self.pos_embedding = nn.Parameter(
-            torch.randn(1, num_steps, num_hiddens))
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_steps, num_hiddens))
         self.dropout = nn.Dropout(emb_dropout)
         self.final_norm = nn.LayerNorm(num_hiddens)
         self.blks = nn.Sequential()

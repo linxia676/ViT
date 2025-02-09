@@ -20,7 +20,7 @@ class ISICDataModule(DataModule):
         ])
         self.labels = pd.read_csv(self.label_file, sep=',')
         self.setup()
-
+    
     def __len__(self):
         return len(self.labels)
 

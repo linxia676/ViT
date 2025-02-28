@@ -6,7 +6,7 @@ from torch.nn import functional as F
 
 class Module(nn.Module, u.HyperParameters):
     """The base class of models."""
-    def __init__(self, plot_train_per_epoch=4, plot_valid_per_epoch=2):
+    def __init__(self, plot_train_per_epoch=1, plot_valid_per_epoch=1):
         super().__init__()
         self.save_hyperparameters()
         self.board = u.ProgressBoard()

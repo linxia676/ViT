@@ -230,8 +230,6 @@ class Trainer(HyperParameters):
         best_epoch, best_val_acc = max(enumerate(self.epoch_his['val_acc']), key=lambda x: x[1])
         best_train_loss, best_val_loss = self.epoch_his['train_losses'][best_epoch], self.epoch_his['val_losses'][best_epoch]
         print(f"*Best epoch {best_epoch + 1:<2}: train loss {best_train_loss:<4.4f} val loss {best_val_loss:<4.4f} val acc {100.0 * best_val_acc:<5.2f}%")
-        
-        
 
     def fit_epoch(self):
         self.model.train()
@@ -282,3 +280,79 @@ class Trainer(HyperParameters):
         if norm > grad_clip_val:
             for param in params:
                 param.grad[:] *= grad_clip_val / norm
+
+class Trainer_Seg(Trainer, HyperParameters):
+    def load_model(self):
+        if os.path.exists(self.last_model_path) and not self.restart_train:
+            checkpoint = torch.load(self.last_model_path)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optim.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.epoch_his = checkpoint['epoch_his']
+            self.model.board.data = checkpoint['board_data']
+        else:
+            self.epoch_his = {}
+            self.epoch_his['train_losses'] = []
+            self.epoch_his['val_losses'] = []
+            self.epoch_his['best_loss'] = float('inf')
+            self.epoch_his['last_epoch'] = -1
+
+    def update_epoch_his(self, train_loss, val_loss):
+        self.epoch_his['train_losses'].append(train_loss)
+        self.epoch_his['val_losses'].append(val_loss)
+        self.epoch_his['last_epoch'] = self.epoch
+
+    def print_training_his(self, max_epochs):
+        for i in range(max_epochs):
+            train_loss = self.epoch_his['train_losses'][i]
+            val_loss = self.epoch_his['val_losses'][i]
+            print(f"Epoch {i + 1:<2}: train loss {train_loss:<4.4f} val loss {val_loss:<4.4f}")
+        best_epoch, best_val_loss = min(enumerate(self.epoch_his['val_losses']), key=lambda x: x[1])
+        best_train_loss = self.epoch_his['train_losses'][best_epoch]
+        print(f"*Best epoch {best_epoch + 1:<2}: train loss {best_train_loss:<4.4f} val loss {best_val_loss:<4.4f}")
+
+    def fit_epoch(self):
+        self.model.train()
+        train_loss_sum, val_loss_sum = 0, 0
+        self.train_batch_idx, self.val_batch_idx = 0, 0
+        for batch in self.train_dataloader:
+            loss = self.model.training_step(self.prepare_batch(batch))
+            self.optim.zero_grad()
+            with torch.no_grad():
+                loss.backward()
+                if self.gradient_clip_val > 0:  # To be discussed later
+                    self.clip_gradients(self.gradient_clip_val, self.model)
+                self.optim.step()
+                self.scheduler.step()
+                train_loss_sum += loss
+            self.train_batch_idx += 1
+        if self.val_dataloader is None:
+            return
+        self.model.eval()
+        for batch in self.val_dataloader:
+            with torch.no_grad():
+                loss = self.model.validation_step(self.prepare_batch(batch))
+                val_loss_sum += loss
+            self.val_batch_idx += 1
+
+        train_loss = train_loss_sum / self.num_train_batches
+        val_loss = val_loss_sum / self.num_val_batches
+        return train_loss, val_loss
+    
+    def fit(self, model, data):
+        self.prepare_data(data)
+        self.prepare_model(model)
+        self.optim, self.scheduler = self.model.configure_optimizers()
+        
+        self.train_batch_idx = 0
+        self.val_batch_idx = 0
+        self.load_model()
+
+        self.strat_epoch = self.epoch_his['last_epoch'] + 1
+        for self.epoch in range(self.strat_epoch, self.max_epochs):
+            train_loss, val_loss = self.fit_epoch()
+            self.update_epoch_his(train_loss, val_loss)
+
+            if val_loss < self.epoch_his['best_loss']:
+                self.epoch_his['best_loss'] = val_loss
+                self.save_model(best_model = True)
+            self.save_model()

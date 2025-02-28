@@ -23,7 +23,7 @@ class ISICDataModule(DataModule):
     
     def __len__(self):
         return len(self.labels)
-
+    
     def __getitem__(self, idx):
         row = self.labels.iloc[idx]
         image_name = row['image'] + '.jpg'
